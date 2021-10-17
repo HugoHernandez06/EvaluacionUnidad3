@@ -1,61 +1,75 @@
 #include <stdio.h>
-#include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <error.h>
 #include <errno.h>
-#include <string.h>
+#include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <memory.h>
+#include <pthread.h>
+#include <string.h>
+#include <ctype.h>
+#include <termios.h>
 
-struct my_msgbuf
+#define SERVER_FIFO "/tmp/addition_fifo_server"
+
+char my_fifo_name [128];
+char buf1 [512], buf2 [1024];
+
+int main (int argc, char *argv[])
 {
-    long mtype;
-    char mtext[200];
-};
+    int fd, fd_server, bytes_read;
 
-int main(int argc, char *argv[]){
-    // Lectura de argumentos argv    
-    for (int i = 0; i < argc; i++)
-    {
-        printf("Argv[%d]: %s\n",i,argv[i]);
-    }
-    // Variables
-    struct my_msgbuf buf;
-    int msqid;
-    int len;
-    key_t key;
-    system("touch pass.txt");
+    // make client fifo
+    sprintf (my_fifo_name, "/tmp/add_client_fifo%ld", (long) getpid ());
 
-    if ((key = ftok("pass.txt", 65)) == -1) {
-        perror("ftok");
-        exit(1);
+    if (mkfifo (my_fifo_name, 0664) == -1){
+       perror ("mkfifo");
     }
-   
-    if ((msqid = msgget(key, 0600 | IPC_CREAT)) == -1) {
-        perror("msgget");
-        exit(1);
-    }
-    printf("Queve Ready.\n");
-    printf("Enter lines of text, Ctrl + D to quit:\n");
-    while(fgets(buf.mtext, sizeof buf.mtext, stdin) != NULL) {
-        len = strlen(buf.mtext);
-        /* remove newline at end, if it exists */
-        if (buf.mtext[len-1] == '\n') buf.mtext[len-1] = '\0';
-        if (msgsnd(msqid, &buf, len+1, 0) == -1) /* +1 for '\0' */
-            perror("msgsnd");
-    }
-    strcpy(buf.mtext, "end");
-    len = strlen(buf.mtext);
-    if (msgsnd(msqid, &buf, len+1, 0) == -1) /* +1 for '\0' */
-    perror("msgsnd");
-    
-    if (msgctl(msqid, IPC_RMID, NULL) == -1) {
-        perror("msgctl");
-        exit(1);
-    }
-    printf("Queve Done Sending messages.\n");
-    system("rm pass.txt");
-    return 0;
+        
 
+    while (1) {
+        // get user input
+        printf ("Message: ");
+        if (fgets(buf1, sizeof (buf1), stdin) == NULL)
+            break;
+
+        strcpy (buf2, my_fifo_name);
+        strcat (buf2, " ");
+        strcat (buf2, buf1);
+        // send message to server
+
+        if ((fd_server = open (SERVER_FIFO, O_WRONLY)) == -1) {
+            perror ("open: server fifo");
+            break;
+        }
+
+        if (write (fd_server, buf2, strlen (buf2)) != strlen (buf2)) {
+            perror ("write");
+            break;
+        }
+
+        if (close (fd_server) == -1) {
+            perror ("close");
+            break;
+        }
+
+        // read the answer
+        if ((fd = open (my_fifo_name, O_RDONLY)) == -1)
+           perror ("open");
+        memset (buf2, '\0', sizeof (buf2));
+        if ((bytes_read = read (fd, buf2, sizeof (buf2))) == -1)
+            perror ("read");
+
+        if (bytes_read > 0) {
+            printf ("%s\n", buf2);
+        }
+
+        if (close (fd) == -1) {
+            perror ("close");
+            break;
+        }
+    }
 }
