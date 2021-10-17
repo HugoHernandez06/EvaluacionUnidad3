@@ -18,6 +18,11 @@
 char my_fifo_name [128];
 char buf1 [512], buf2 [1024];
 
+void funcSub(char *buffer);
+void funcUnsub(char *buffer);
+void funcListC(char *buffer);
+void funcAsk(char *buffer);
+
 int main (int argc, char *argv[])
 {
     int fd, fd_server, bytes_read;
@@ -29,7 +34,6 @@ int main (int argc, char *argv[])
        perror ("mkfifo");
     }
         
-
     while (1) {
         // get user input
         printf ("Message: ");
@@ -73,3 +77,16 @@ int main (int argc, char *argv[])
         }
     }
 }
+void funcSub(char *buffer){
+    printf("Soy sub");
+}
+void funcUnsub(char *buffer){
+    printf("Soy unsub");
+}
+void funcListC(char *buffer){
+    printf("Soy List");
+}
+void funcAsk(char *buffer){
+    printf("Soy Ask");
+}
+

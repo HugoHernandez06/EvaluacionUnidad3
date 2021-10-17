@@ -12,6 +12,12 @@
 
 #define SERVER_FIFO "/tmp/addition_fifo_server"
 
+void funcExit(char *buffer);
+void funcAdd(char *buffer);
+void funcRemove(char *buffer);
+void funcTrigger(char *buffer);
+void funcList(char *buffer);
+
 int main (int argc, char **argv)
 {
     int fd, fd_client, bytes_read;
@@ -59,4 +65,20 @@ int main (int argc, char **argv)
         }
     }
     return(EXIT_SUCCESS);
+}
+
+void funcExit(char *buffer){
+    printf("Soy Exit");
+}
+void funcAdd(char *buffer){
+    printf("Soy Add");
+}
+void funcRemove(char *buffer){
+    printf("Soy Remove");
+}
+void funcTrigger(char *buffer){
+    printf("Soy Trigger");
+}
+void funcList(char *buffer){
+    printf("Soy List");
 }
