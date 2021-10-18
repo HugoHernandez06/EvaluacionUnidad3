@@ -126,17 +126,14 @@ int main (int argc, char **argv)
         } 
     }
     
-
     return(EXIT_SUCCESS);
 }
 
 void funcExit(){
-    printf("Soy Exit\n");
     funcTrigger("exit");
     exit(0);
 }
 void funcAdd(char *resp){
-    printf("Soy Add\n");
     for (int i = 0; i < 10; i++)
     {
         if (strcmp(event[i],"null") == 0)
@@ -171,7 +168,6 @@ void funcTrigger(char *resp){
         } 
 }
 void funcList(){
-    printf("Soy List\n");
     for (int i = 0; i < 10; i++)
     {
         printf("Eventos %d: %s\n",i,event[i]);
