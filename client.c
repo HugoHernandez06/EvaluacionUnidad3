@@ -1,30 +1,40 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <mqueue.h>
 #include <error.h>
 #include <errno.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <string.h>
-#include <memory.h>
 #include <pthread.h>
-#include <string.h>
 #include <ctype.h>
 #include <termios.h>
 
-#define SERVER_FIFO "/tmp/addition_fifo_server"
+#define SERVER_QUEUE_NAME   "/sp-server" 
+#define QUEUE_PERMISSIONS 0660
+#define MAX_MESSAGES 10
+#define MAX_MSG_SIZE 256
+#define MSG_BUFFER_SIZE MAX_MSG_SIZE + 10
+
+pthread_mutex_t keyQueue;
+
+char client_queue_name [64];
+mqd_t qd_server, qd_client;   // queue descriptors
+struct mq_attr attr;
+char in_buffer [MSG_BUFFER_SIZE]; // ID por Client
+char in_buffer0 [MSG_BUFFER_SIZE]; // msg
+
+void funcSender(char *resp);
+
+void *readCommands(void *arg);
+void *readReceiver(void *arg);
+
 char comando[100];
-char my_fifo_name [128];
-char buf1 [512], buf2 [1024];
 
-void funcSub(char *buffer);
-void funcUnsub(char *buffer);
-void funcListC(char *buffer);
-void funcAsk(char *buffer);
-void *threadComandos(void *arg);
-
-void *threadComandos(void *arg){
+void *readCommands(void *arg){
     while (1)
     {
         fgets(comando,sizeof(comando),stdin);
@@ -44,98 +54,71 @@ void *threadComandos(void *arg){
             {
                 resp = token;
             }
-            token = strtok(NULL," ");
+            token = strtok(NULL,"_");
         }
 
-        int sub = strcmp(action,"sub\n");
-        int unsub = strcmp(action,"unsub");
-        int list = strcmp(action,"list\n");
-        int ask = strcmp(action,"ask");
-
-        if (sub == 0)
+        int msg = strcmp(action,"m:");
+        if (msg == 0)
         {
-            funcSub(resp);
-        }else if (unsub == 0)
-        {
-            funcUnsub(resp);
-        }else if (list == 0)
-        {
-            funcList(resp);
-        }else if (ask == 0)
-        {
-            funcAsk(resp);
+            funcSender(resp);
         }
     }
     return NULL;
 }
 
-int main (int argc, char *argv[])
+void *readReceiver(void *arg){
+    // create the client queue for receiving messages from server
+    
+    if ((qd_client = mq_open (client_queue_name, O_RDONLY | O_CREAT, QUEUE_PERMISSIONS, &attr))!=-1)
+    {
+        while (1)
+        {
+            pthread_mutex_lock(&keyQueue);
+            // receive response from server
+            if (mq_receive (qd_client, in_buffer, MSG_BUFFER_SIZE, NULL) == -1) {
+                perror ("Client: mq_receive");
+            }
+            // display token received from server
+            printf ("Client: message received from server: %s\n", in_buffer);
+            pthread_mutex_unlock(&keyQueue);
+        }
+    }
+    return NULL;
+}
+
+
+int main (int argc, char **argv)
 {
-    pthread_t threadsID;
-    pthread_create(&threadsID,NULL,&threadComandos, NULL);
+    // create the client queue for receiving messages from server
+    sprintf (client_queue_name, "/sp-client-%d", getpid ());
+    
+    pthread_t threadsCmd,threadsReceiver;
+    pthread_mutex_init(&keyQueue,NULL);
+    pthread_create(&threadsCmd,NULL,&readCommands, NULL);
+    pthread_create(&threadsReceiver,NULL,&readReceiver,NULL);
+    pthread_join(threadsCmd,NULL);
+    pthread_join(threadsReceiver,NULL);
+    
+    attr.mq_flags = 0;
+    attr.mq_maxmsg = MAX_MESSAGES;
+    attr.mq_msgsize = MAX_MSG_SIZE;
+    attr.mq_curmsgs = 0;
+    
+    return(EXIT_SUCCESS);
+}
 
-    int fd, fd_server, bytes_read;
-
-    // make client fifo
-    sprintf (my_fifo_name, "/tmp/add_client_fifo%ld", (long) getpid ());
-
-    if (mkfifo (my_fifo_name, 0664) == -1){
-       perror ("mkfifo");
-    }
-        
-    while (1) {
-        // get user input
-        printf ("Message: ");
-        if (fgets(buf1, sizeof (buf1), stdin) == NULL)
-            break;
-
-        strcpy (buf2, my_fifo_name);
-        strcat (buf2, " ");
-        strcat (buf2, buf1);
+void funcSender(char *resp){
+    char temp_buf [100];
+    if ((qd_server = mq_open (SERVER_QUEUE_NAME, O_WRONLY))!=-1)
+    {
         // send message to server
-
-        if ((fd_server = open (SERVER_FIFO, O_WRONLY)) == -1) {
-            perror ("open: server fifo");
-            break;
+        if ((mq_send (qd_server, client_queue_name, strlen (client_queue_name) + 1, 0)) == -1) {
+            perror ("Client: Not able to send message to server");
         }
-
-        if (write (fd_server, buf2, strlen (buf2)) != strlen (buf2)) {
-            perror ("write");
-            break;
+        if ((mq_send (qd_server, resp, sizeof(resp), 0)) == -1) {
+            perror ("Client: Not able to send message to server");
         }
-
-        if (close (fd_server) == -1) {
-            perror ("close");
-            break;
-        }
-
-        // read the answer
-        if ((fd = open (my_fifo_name, O_RDONLY)) == -1)
-           perror ("open");
-        memset (buf2, '\0', sizeof (buf2));
-        if ((bytes_read = read (fd, buf2, sizeof (buf2))) == -1)
-            perror ("read");
-
-        if (bytes_read > 0) {
-            printf ("%s\n", buf2);
-        }
-
-        if (close (fd) == -1) {
-            perror ("close");
-            break;
-        }
+    }else{
+        perror("Error al enviar: ");
     }
 }
-void funcSub(char *buffer){
-    printf("Soy sub");
-}
-void funcUnsub(char *buffer){
-    printf("Soy unsub");
-}
-void funcListC(char *buffer){
-    printf("Soy List");
-}
-void funcAsk(char *buffer){
-    printf("Soy Ask");
-}
-
