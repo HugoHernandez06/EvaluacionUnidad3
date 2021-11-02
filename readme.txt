@@ -17,5 +17,4 @@ Para establer la comunicion el cliente debe enviar un mensaje al server por medi
 ---------------------------------------------
  NOTA IMPORTANTE!!!
 
- Pese a nuestros esfuerzos el resultado no fue el esperado por ninguno de los dos, pero la logica y arquitectura del programa
- nos quedó muy clara con los diferentes conceptos, pero nos falló al momento de plasmarlo en código. 
+ Pese a nuestros esfuerzos el resultado no fue el esperado por ninguno de los dos, pero la logica y arquitectura del programa nos quedó muy clara con los diferentes conceptos, pero nos falló al momento de plasmarlo en código. 
